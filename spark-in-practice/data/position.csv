@@ -1,0 +1,19 @@
+position_id;position_title;pay_type;min_scale;max_scale;management_role
+1;President;Monthly;25000.0;85000.0;Senior Management
+2;VP Country Manager;Monthly;20000.0;40000.0;Senior Management
+3;VP Information Systems;Monthly;12500.0;25000.0;Senior Management
+4;VP Human Resources;Monthly;10000.0;20000.0;Senior Management
+5;VP Finance;Monthly;17000.0;35000.0;Senior Management
+6;HQ Information Systems;Monthly;6700.0;10000.0;Middle Management
+7;HQ Marketing;Monthly;5000.0;8500.0;Middle Management
+8;HQ Human Resources;Monthly;5000.0;6700.0;Middle Management
+9;HQ Finance and Accounting;Monthly;5000.0;6700.0;Middle Management
+11;Store Manager;Monthly;8500.0;17000.0;Store Management
+12;Store Assistant Manager;Monthly;6700.0;12500.0;Store Management
+13;Store Shift Supervisor;Monthly;6700.0;8500.0;Store Management
+14;Store Information Systems;Monthly;6700.0;10000.0;Store Full Time Staff
+15;Store Permanent Checker;Monthly;5000.0;9000.0;Store Full Time Staff
+16;Store Temporary Checker;Hourly;20.0;40.0;Store Full Time Staff
+17;Store Permanent Stocker;Monthly;3400.0;6700.0;Store Full Time Staff
+18;Store Temporary Stocker;Hourly;20.0;40.0;Store Temp Staff
+19;Store Permanent Butcher;Monthly;6700.0;10000.0;Store Full Time Staff
