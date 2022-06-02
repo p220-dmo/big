@@ -7,18 +7,27 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
+import fr.htc.spark.common.GlobalConstants;
 import fr.htc.spark.config.SparkConfig;
 
-public interface Reader<ID,TYPE> {
-	
+public interface Reader<ID, TYPE> {
+
 	JavaSparkContext jsc = SparkConfig.getJavaSparkContext();
 	SparkSession ss = SparkConfig.getSparkSession();
-	
+
 	public JavaRDD<String> getStringRdd();
-	
+
 	public JavaRDD<TYPE> getObjectRdd();
-	
+
 	public JavaPairRDD<ID, TYPE> getPairRdd();
+
+	/**
+	 * 
+	 * @param KeyFlag
+	 * @see GlobalConstants
+	 * @return
+	 */
+	public JavaPairRDD<ID, TYPE> getPairRdd(int KeyFlag);
 
 	Dataset<Row> getDataSet();
 

@@ -108,6 +108,11 @@ public class Sale implements Serializable {
 				+ ", unitSales=" + unitSales + "]";
 	}
 
+	public Object toCSVFormat(String string) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 	
 	
 }

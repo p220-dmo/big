@@ -7,26 +7,28 @@ import org.apache.spark.sql.SparkSession;
 public class SparkConfig {
 
 	/**
-	 * 
-	 * @return
+	 * @return JavaSparkContext
 	 */
 	public static JavaSparkContext getJavaSparkContext() {
 		return JavaSparkContext.fromSparkContext(getSparkSession().sparkContext());
 	}
 
+	/**
+	 * @return SparkSession
+	 */
 	public static SparkSession getSparkSession() {
 		return SparkSession.builder()
-				.appName("Mining Frequent Itemset/Assiocation rules from purchasing basket")
+				.appName("MySpark App")
 				.master("local[*]")
-				.config("spark.sql.warehouse.dir", "warehouseLocation") // adding config parameters
+				.config("spark.sql.warehouse.dir", "warehouseLocation")
 				.getOrCreate();
 	}
-	
+
+	/**
+	 * @return SparkContext
+	 */
 	public static SparkContext getSparkContext() {
 		return getSparkSession().sparkContext();
 	}
-	
-	
-	
 
 }

@@ -65,4 +65,10 @@ public class TimeReader implements Reader<Integer, TimeByDay> {
 				.load(filePath);
 	}
 
+	@Override
+	public JavaPairRDD<Integer, TimeByDay> getPairRdd(int KeyFlag) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 }

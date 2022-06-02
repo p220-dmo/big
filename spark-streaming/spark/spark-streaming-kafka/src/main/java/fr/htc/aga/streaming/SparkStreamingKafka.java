@@ -117,7 +117,7 @@ public class SparkStreamingKafka {
 	 */
 	public static void handleRDDStream(JavaRDD<ConsumerRecord<String, String>> javaRDD) {
 		System.out.println("*********************************************************");
-		//javaRDD.foreach(f -> System.out.println(f.value()));
+		javaRDD.foreach(f -> System.out.println(f.value()));
 		System.out.println(javaRDD.count());
 		System.out.println("*********************************************************");
 	}

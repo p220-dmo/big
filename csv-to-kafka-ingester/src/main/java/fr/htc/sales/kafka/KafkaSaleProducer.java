@@ -11,6 +11,7 @@ public class KafkaSaleProducer {
 		KafkaProducer<Integer, Sale> producer = new KafkaProducer<Integer, Sale>(KafkaConfig.getProducerProps());
 		
 		System.out.printf("Sending message topic: %s, value: %s%n", topicName, sale);
+		
 		producer.send(new ProducerRecord<Integer, Sale>(topicName, sale.getCustomerId(), sale));
 		
 		producer.flush();

@@ -35,6 +35,12 @@ public class StoreReader implements Reader<Integer, Store> {
 		return null;
 	}
 
+	@Override
+	public JavaPairRDD<Integer, Store> getPairRdd(int KeyFlag) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 
 
 

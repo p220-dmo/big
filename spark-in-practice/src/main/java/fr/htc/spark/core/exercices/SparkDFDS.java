@@ -6,11 +6,9 @@ import static org.apache.spark.sql.functions.count;
 import static org.apache.spark.sql.functions.sum;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.spark.api.java.function.ForeachPartitionFunction;
 import org.apache.spark.api.java.function.MapFunction;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoder;
@@ -22,11 +20,10 @@ import org.apache.spark.sql.api.java.UDF1;
 import org.apache.spark.sql.types.DataTypes;
 
 import avro.shaded.com.google.common.collect.ImmutableMap;
-import fr.htc.spark.core.model.Customer;
-import fr.htc.spark.core.model.Sale;
+import fr.htc.spark.beans.Sale;
+import fr.htc.spark.core.model.Customer2;
 import fr.htc.spark.core.model.Store;
 import fr.htc.spark.core.model.TimeByDay;
-import fr.htc.spark.core.utils.ESClient;
 import fr.htc.spark.core.utils.Util;
 
 public class SparkDFDS {
@@ -37,7 +34,9 @@ public class SparkDFDS {
         String storeFilePath = "data/stores.csv";
         String timeByDayFilePath = "data/time_by_day.csv";
         String customerFilePath = "data/customers.csv";
+
         SparkSession sparkSession = buildSparkSession();
+/*
         Dataset<Sale> dataset = Util.loadAsDS(sparkSession, salesFilePath, Sale.class);
         dataset.printSchema();
 
@@ -65,12 +64,13 @@ public class SparkDFDS {
         
         averageBasketByEducationLevel(sparkSession, salesFilePath, customerFilePath);
         
-        //saveEnrichedSalesToES(sparkSession,salesFilePath) ;
-        //saveAsCSV(sparkSession,salesFilePath,"data/salesnew.csv") ;
-        //savePartitionnedDataAsCSV(sparkSession,salesFilePath,timeByDayFilePath,"data/outpartitionned") ;
-        
+        saveEnrichedSalesToES(sparkSession,salesFilePath) ;
+        saveAsCSV(sparkSession,salesFilePath,"data/salesnew.csv") ;
+        savePartitionnedDataAsCSV(sparkSession,salesFilePath,timeByDayFilePath,"data/outpartitionned") ;
         averageBasketByEducationLevelUsingSparkSQL(sparkSession, salesFilePath, customerFilePath);
+//*/      
         cleaningSalesDataSet(sparkSession, salesFilePath, storeFilePath);
+/*        
         printPhysicalPExecutionPlan(sparkSession, salesFilePath, storeFilePath);
         computeSumCACostByStoreIdAndGlobally(sparkSession, salesFilePath, storeFilePath);
         transformCustomerIncome(sparkSession, customerFilePath);
@@ -150,17 +150,7 @@ public class SparkDFDS {
                 .schema(Util.buildSchema(Sale.class))
                 .load(filePath);
 
-        Dataset<Sale> salesAsDataSet = salesAsDF.map((MapFunction<Row, Sale>) row -> Sale
-                .builder()
-                .productId((Integer) row.get(0))
-                .timeId((Integer) row.get(1))
-                .customerId((Long) row.get(2))
-                .promotionId((Integer) row.get(3))
-                .storeId((Integer) row.get(4))
-                .storeSales((Double) row.get(5))
-                .storeCost((Double) row.get(6))
-                .unitSales((Double) row.get(7))
-                .build(), Encoders.bean(Sale.class));
+        Dataset<Sale> salesAsDataSet = salesAsDF.map((MapFunction<Row, Sale>) row -> Sale.parse(filePath), Encoders.bean(Sale.class));
         salesAsDataSet.printSchema();
         return salesAsDataSet;
     }
@@ -265,32 +255,32 @@ public class SparkDFDS {
         caByQuarter.show();
     }
 
-    /*
-    Solution de l'exercice 8
-     */
-    public static void saveEnrichedSalesToES(SparkSession sparkSession, String salesFilePath) throws Exception {
-        // Charger le fichier sales.csv
-        Dataset<Row> salesAsDF = Util
-                .loadAsDF(sparkSession, salesFilePath, Sale.class);
-
-        salesAsDF.foreachPartition(new ForeachPartitionFunction<Row>() {
-            ESClient es = new ESClient("localhost", 9200);
-
-            @Override
-            public void call(Iterator<Row> iterator) throws Exception {
-                iterator.forEachRemaining(sale -> {
-                    es.index("sales", Util.rowToMap(sale));
-                });
-            }
-        });
-    }
+//    /*
+//    Solution de l'exercice 8
+//     */
+//    public static void saveEnrichedSalesToES(SparkSession sparkSession, String salesFilePath) throws Exception {
+//        // Charger le fichier sales.csv
+//        Dataset<Row> salesAsDF = Util
+//                .loadAsDF(sparkSession, salesFilePath, Sale.class);
+//
+//        salesAsDF.foreachPartition(new ForeachPartitionFunction<Row>() {
+//            ESClient es = new ESClient("localhost", 9200);
+//
+//            @Override
+//            public void call(Iterator<Row> iterator) throws Exception {
+//                iterator.forEachRemaining(sale -> {
+//                    es.index("sales", Util.rowToMap(sale));
+//                });
+//            }
+//        });
+//    }
 
     /*
    Exercice 9
     */
     public static void averageBasketByEducationLevel(SparkSession sparkSession, String salesFilePath, String customerFilePath) throws Exception {
         // Lecture du fichier customer à broadcaster
-        Dataset<Row> customerEducation = Util.loadAsDF(sparkSession, customerFilePath, Customer.class)
+        Dataset<Row> customerEducation = Util.loadAsDF(sparkSession, customerFilePath, Customer2.class)
                 .select(col("customerId").as("cid"), col("education"));
 
         // Charger le fichier sales.csv
@@ -363,7 +353,7 @@ public class SparkDFDS {
      */
     public static void averageBasketByEducationLevelUsingSparkSQL(SparkSession sparkSession, String salesFilePath, String customerFilePath) throws Exception {
         // Lecture du fichier customer à broadcaster
-        Dataset<Row> customerEducation = Util.loadAsDF(sparkSession, customerFilePath, Customer.class)
+        Dataset<Row> customerEducation = Util.loadAsDF(sparkSession, customerFilePath, Customer2.class)
                 .select(col("customerId").as("cid"), col("education"));
         // Charger le fichier sales.csv
         Dataset<Row> salesAsDF = Util.loadAsDF(sparkSession, salesFilePath, Sale.class)
@@ -389,12 +379,12 @@ public class SparkDFDS {
      */
     public static void cleaningSalesDataSet(SparkSession sparkSession, String salesFilePath, String storeFilePath) throws Exception {
         // Lecture du fichier customer à broadcaster
-        Dataset<Row> storesAsDF = Util.loadAsDF(sparkSession, storeFilePath, Store.class)
-                .select(col("id").as("stId"));
+        Dataset<Row> storesAsDF = Util.loadAsDF(sparkSession, storeFilePath, Store.class).select(col("id").as("stId"));
         // Charger le fichier sales.csv
         Dataset<Row> salesAsDF = Util.loadAsDF(sparkSession, salesFilePath, Sale.class);
 
-        Dataset<Row> salesCleant = salesAsDF.drop(col("promotionId"))
+        Dataset<Row> salesCleant = 
+        		salesAsDF.drop(col("promotionId"))
                 .na()
                 .drop("any", new String[]{"storeCost", "storeSales", "unitSales", "customerId"})
                 .where(col("storeCost").gt(0).and(col("storeSales").gt(0)).and(col("unitSales").gt(0)))
@@ -402,7 +392,7 @@ public class SparkDFDS {
                 .na()
                 .fill(ImmutableMap.of("stId", -1))
                 .drop(col("storeId"))
-                .withColumnRenamed("stId", "storeId")
+                .withColumnRenamed("stId", "store_Id")
                 .withColumn("rowCA", col("storeSales").multiply(col("unitSales")));
         salesCleant.printSchema();
         salesCleant.show();
@@ -442,7 +432,7 @@ public class SparkDFDS {
      */
     public static void transformCustomerIncome(SparkSession sparkSession, String customerFilePath) throws Exception {
         // Lecture du fichier customer à broadcaster
-        Dataset<Row> customerAsDF = Util.loadAsDF(sparkSession, customerFilePath, Customer.class);
+        Dataset<Row> customerAsDF = Util.loadAsDF(sparkSession, customerFilePath, Customer2.class);
         customerAsDF.createGlobalTempView("customer");
         customerAsDF.sparkSession().sqlContext().udf().register("retrieve_income", new UDF1<String, Double>() {
             @Override
@@ -463,7 +453,7 @@ public class SparkDFDS {
      */
     public static void testCube(SparkSession sparkSession, String salesFilePath, String customerFilePath, String storeFilePath, String timeByDay) throws Exception {
         Dataset<Row> salesAsDF = Util.loadAsDF(sparkSession, salesFilePath, Sale.class);
-        Dataset<Row> customerAsDF = Util.loadAsDF(sparkSession, customerFilePath, Customer.class)
+        Dataset<Row> customerAsDF = Util.loadAsDF(sparkSession, customerFilePath, Customer2.class)
                 .withColumnRenamed("customerId", "cId");
         Dataset<Row> storeAsDF = Util.loadAsDF(sparkSession, storeFilePath, Store.class)
                 .withColumnRenamed("id", "sId").drop(col("country"));

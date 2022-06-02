@@ -53,7 +53,7 @@ public class TemperatureServerWithCity {
 
                 while (true) {
                     String event = eventQueue.take();
-                    System.out.println(String.format("Envoi de la tempÃ©rature \"%s\" sur la socket.", event));
+                    System.out.println(String.format("Envoi de la température \"%s\" sur la socket.", event));
                     out.println(event);
                 }
             } catch (IOException | InterruptedException e) {

@@ -13,8 +13,8 @@ public interface Constants {
 	//                        REST API
 	//********************************************************************************
 	public final static String API_URL = "https://api.schiphol.nl/public-flights/flights";
-	public final static String API_REST_ID = "ddf5a84d";
-	public final static String API_REST_KEY = "cba9fc3b52ccc8e445ae7a01a8fc6157";
+	public final static String API_REST_ID = "6dc85fde";
+	public final static String API_REST_KEY = "19b9c6bbb6e41c8c2582b565d28db4f7";
 	public final static String FLIGHTS_SERVICE_PATH = "flights";
 	public final static String CHARSET_ENCODING = "UTF-8";
 	

@@ -36,10 +36,7 @@ public class WordCount {
       System.err.println("Usage: wordcount <in> <out>");
       System.exit(2);
     }
-
-    
     Job job = Job.getInstance(conf, "wordCount");
-    
     
     job.setJarByClass(WordCount.class);
     

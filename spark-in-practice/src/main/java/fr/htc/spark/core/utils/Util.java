@@ -4,8 +4,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -19,11 +17,6 @@ import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-
-import fr.htc.spark.core.model.Sale;
-import scala.Tuple2;
-import scala.collection.Iterator;
-import scala.collection.JavaConverters;
 
 public class Util {
     public static Map<String, DataType> JAVATYPETOSPARKSQLMAPPING = Stream.of(
@@ -40,25 +33,31 @@ public class Util {
             new AbstractMap.SimpleEntry<>("java.lang.String",DataTypes.StringType)
     ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)) ;
 
-    public static Map<String, Object> rowToMap(Row r) {
-        List<String> fields = Arrays.asList(r.schema().fields()).stream().map(f -> f.name()).collect(Collectors.toList());
-        scala.collection.immutable.Map<String, Object> valuesMap = r.getValuesMap(
-                JavaConverters.asScalaIteratorConverter(fields.iterator()).asScala().toSeq());
+//    /**
+//     * 
+//     * @param r
+//     * @return
+//     */
+//    public static Map<String, Object> rowToMap(Row r) {
+//        List<String> fields = Arrays.asList(r.schema().fields()).stream().map(f -> f.name()).collect(Collectors.toList());
+//        scala.collection.immutable.Map<String, Object> valuesMap = r.getValuesMap(
+//                JavaConverters.asScalaIteratorConverter(fields.iterator()).asScala().toSeq());
+//
+//        Map<String, Object> rowAsMap = new HashMap<String, Object>();
+//        
+//        
+//        Iterator<Tuple2<String, Object>> it = valuesMap.iterator();
+//        
+//        
+//        while (it.hasNext()) {
+//            Tuple2<String, Object> next = it.next();
+//            rowAsMap.put(next._1(), next._2());
+//        }
+//        return rowAsMap;
+//    }
 
-        Map<String, Object> rowAsMap = new HashMap<String, Object>();
-        
-        
-        Iterator<Tuple2<String, Object>> it = valuesMap.iterator();
-        
-        
-        while (it.hasNext()) {
-            Tuple2<String, Object> next = it.next();
-            rowAsMap.put(next._1(), next._2());
-        }
-        return rowAsMap;
-    }
-
-    public static StructType buildSchema(Class cls) throws Exception {
+    @SuppressWarnings("rawtypes")
+	public static StructType buildSchema(Class cls) throws Exception {
         Field[] fields = cls.getDeclaredFields();
         List<StructField> structFields = new ArrayList<>();
         for (Field field : fields) {
@@ -84,7 +83,8 @@ public class Util {
                 ;
     }
 
-    public static <T> Dataset<T> loadAsDS(SparkSession sparkSession, String saleFilePath, Class cls) throws Exception {
+    @SuppressWarnings("unchecked")
+	public static <T> Dataset<T> loadAsDS(SparkSession sparkSession, String saleFilePath, Class cls) throws Exception {
         return sparkSession
                 .read()
                 .format("csv")
@@ -96,9 +96,4 @@ public class Util {
          ;
     }
 
-    public static void main(String[] args) throws Exception {
-        StructType structType = buildSchema(Sale.class);
-        structType.printTreeString();
-
-    }
 }

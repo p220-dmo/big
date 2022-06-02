@@ -17,232 +17,237 @@ import org.apache.spark.sql.SparkSession;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import fr.htc.spark.core.model.Customer;
-import fr.htc.spark.core.model.Sale;
-import fr.htc.spark.core.model.Store;
-import fr.htc.spark.core.model.TimeByDay;
+import fr.htc.spark.beans.Sale;
+import fr.htc.spark.beans.Store;
+import fr.htc.spark.beans.TimeByDay;
+import fr.htc.spark.common.GlobalConstants;
+import fr.htc.spark.core.model.Customer2;
 import fr.htc.spark.core.utils.ESClient;
+import fr.htc.spark.readers.SaleReader;
 import scala.Tuple2;
 import scala.reflect.ClassTag$;
 
 public class SparkCore {
 
-    public static void main(String[] args) {
-        String salesFilePath = "data/sales.csv";
-        String storeFilePath = "data/stores.csv";
-        String timeByDayFilePath = "data/time_by_day.csv";
-        String customerFilePath = "data/customers.csv";
+	public static void main(String[] args) {
+		String salesFilePath = "data/sales.csv";
+		String storeFilePath = "data/stores.csv";
+		String timeByDayFilePath = "data/time_by_day.csv";
+		String customerFilePath = "data/customers.csv";
 
-        SparkSession sparkSession = buildSparkSession();
-        JavaRDD<Sale> saleJavaRDD = readFileAsSaleObjectRDD(sparkSession, salesFilePath);
-        saleJavaRDD.take(5).forEach(System.out::println);
-        computeStoreCAUsingReduceByKey(sparkSession,salesFilePath) ;
-        computeStoreCAUsingGroupByKey(sparkSession,salesFilePath) ;
-        numberOfUnitsSoltByStore(sparkSession,salesFilePath) ;
-        computeTopPerformerDepartment(sparkSession,salesFilePath,storeFilePath) ;
-        CAOfQuarterBetweenYears(sparkSession,salesFilePath,timeByDayFilePath,"Q1") ;
-        //saveEnrichedSalesToES(sparkSession,salesFilePath) ;
-        //saveAsCSV(sparkSession,salesFilePath) ;
-        averageBasketByEducationLevel(sparkSession,salesFilePath,customerFilePath) ;
-    }
+		SaleReader sr = new SaleReader();
+		sr.getPairRdd(GlobalConstants.STORE_ID_FLAG);
 
-    /*
-    Exercice 1
-     */
-    public static SparkSession buildSparkSession(){
-        SparkSession sparkSession = SparkSession
-                .builder()
-                .appName("Spark core training")
-                .master("local[*]")
-                .config("spark.sql.warehouse.dir", "warehouseLocation") //adding config parameters
-                .getOrCreate();
-        return sparkSession ;
-    }
-    /*
-    Exercice 2
-     */
-    public static JavaRDD<String> readFileAsStringObjectRDD(SparkSession sparkSession, String filePath){
-        JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
-        JavaRDD<String> salesAsStringRDD = jsc.textFile(filePath);
-        // Afficher 4 éléments de la RDD
-        salesAsStringRDD.take(4).stream().forEach(System.out::println);
-        return salesAsStringRDD ;
-    }
+		SparkSession sparkSession = buildSparkSession();
+		JavaRDD<Sale> saleJavaRDD = readFileAsSaleObjectRDD(sparkSession, salesFilePath);
+		saleJavaRDD.take(5).forEach(System.out::println);
 
-    /*
-    Exercice 3
-     */
-    public static JavaRDD<Sale> readFileAsSaleObjectRDD(SparkSession sparkSession, String filePath){
-        JavaRDD<Sale> salesAsObjects = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(filePath)
-                .map(s -> Sale.parse(s, ";"));
-        salesAsObjects.take(5).stream().forEach(System.out::println);
-        return salesAsObjects ;
-    }
+		computeStoreCAUsingReduceByKey(sparkSession, salesFilePath);
 
-    /*
-    Exercice 4
-     */
-    public static JavaPairRDD<Integer, Double> computeStoreCAUsingReduceByKey(SparkSession sparkSession,String filePath){
-        JavaRDD<Sale> salesAsObjects = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(filePath)
-                .map((Function<String, Sale>) s -> Sale.parse(s, ";"));
+		computeStoreCAUsingGroupByKey(sparkSession, salesFilePath);
 
-        JavaPairRDD<Integer, Double> storeCA = salesAsObjects
-                .mapToPair((PairFunction<Sale, Integer, Double>) sale -> new Tuple2<>(sale.getStoreId(), sale.getStoreSales() * sale.getUnitSales()))
-                .reduceByKey((Function2<Double, Double, Double>) (a, b) -> a + b);
+		numberOfUnitsSoltByStore(sparkSession, salesFilePath);
 
-        storeCA.collectAsMap().forEach((k,v) -> System.out.println("Magasin : " + k + " a un chiffre d'affaires : " + v));
-        return storeCA ;
-    }
+		computeTopPerformerDepartment(sparkSession, salesFilePath, storeFilePath);
 
-    /*
-    Exercice 4
-     */
-    public static JavaPairRDD<Integer, Double> computeStoreCAUsingGroupByKey(SparkSession sparkSession,String filePath){
+		CAOfQuarterBetweenYears(sparkSession, salesFilePath, timeByDayFilePath, "Q1");
 
-        JavaPairRDD<Integer, Double> storeCA = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(filePath)
-                .map((Function<String, Sale>) s -> Sale.parse(s, ";"))
-                .mapToPair((PairFunction<Sale, Integer, Double>) sale -> new Tuple2<>(sale.getStoreId(), sale.getStoreSales() * sale.getUnitSales()))
-                .groupByKey()
-                .mapToPair((PairFunction<Tuple2<Integer, Iterable<Double>>, Integer, Double>) storeSalesCA -> new Tuple2<>(storeSalesCA._1(),
-                        StreamSupport.stream(storeSalesCA._2().spliterator(), false).reduce((x, y) -> x + y).get())
-                );
-        storeCA.collectAsMap().forEach((k,v) -> System.out.println("Magasin : " + k + " a un chiffre d'affaires : " + v));
-        return storeCA ;
-    }
+		saveEnrichedSalesToES(sparkSession, salesFilePath);
+		saveAsCSV(sparkSession, salesFilePath);
+		averageBasketByEducationLevel(sparkSession, salesFilePath, customerFilePath);
+	}
 
-    /*
-    Exercice 5
-     */
-    public static Map<Integer, Long> numberOfUnitsSoltByStore(SparkSession sparkSession,String filePath){
-        Map<Integer, Long> numberUnitsByStore = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(filePath)
-                .map((Function<String, Sale>) s -> Sale.parse(s, ";"))
-                .mapToPair((PairFunction<Sale, Integer, Double>) sale -> new Tuple2<>(sale.getStoreId(), sale.getUnitSales()))
-                .countByKey();
-        numberUnitsByStore.forEach((k,v) -> System.out.println("Magasin : " + k + " a un vendu : " + v + " unités"));
-        return numberUnitsByStore ;
-    }
+	/*
+	 * Exercice 1
+	 */
+	public static SparkSession buildSparkSession() {
+		SparkSession sparkSession = SparkSession.builder().appName("Spark core training").master("local[*]")
+				.config("spark.sql.warehouse.dir", "warehouseLocation") // adding config parameters
+				.getOrCreate();
+		return sparkSession;
+	}
 
-    /*
-    Exercice 6
-     */
-    public static void computeTopPerformerDepartment(SparkSession sparkSession,String salesFilePath,String storeFilePath){
-        // Lecture du fichier store à broadcaster (fichier très petit)
-        Map<Integer, Integer> storeRegionMapRdd = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(storeFilePath)
-                .mapToPair((PairFunction<String, Integer, Integer>) s -> {
-                    Store parse = Store.parse(s);
-                    return new Tuple2<>(parse.getId(), parse.getRegionId());
-                })
-                .collectAsMap();
-        Broadcast<Map<Integer, Integer>> storeRegionMap = sparkSession.sparkContext().broadcast(storeRegionMapRdd, ClassTag$.MODULE$.apply(Map.class));
+	/*
+	 * Exercice 2
+	 */
+	public static JavaRDD<String> readFileAsStringObjectRDD(SparkSession sparkSession, String filePath) {
+		JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
+		JavaRDD<String> salesAsStringRDD = jsc.textFile(filePath);
+		// Afficher 4 éléments de la RDD
+		salesAsStringRDD.take(4).stream().forEach(System.out::println);
+		return salesAsStringRDD;
+	}
 
-        // Faire un Map-side Join
-        JavaPairRDD<Integer, Double> caByRegion = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(salesFilePath)
-                .mapToPair((PairFunction<String, Integer, Double>) s -> {
-                    Sale sale = Sale.parse(s);
-                    return new Tuple2<>(storeRegionMap.value().getOrDefault(sale.getStoreId(), -1),
-                            sale.getUnitSales() * sale.getStoreSales());
-                })
-                .reduceByKey((Function2<Double, Double, Double>) (a, b) -> a + b)
-                ;
+	/*
+	 * Exercice 3
+	 */
+	public static JavaRDD<Sale> readFileAsSaleObjectRDD(SparkSession sparkSession, String filePath) {
+		JavaRDD<Sale> salesAsObjects = JavaSparkContext.fromSparkContext(sparkSession.sparkContext()).textFile(filePath)
+				.map(s -> Sale.parse(s));
+		salesAsObjects.take(5).stream().forEach(System.out::println);
+		return salesAsObjects;
+	}
 
-        caByRegion.collectAsMap().forEach((k,v) -> System.out.println("Region : " + k + " avec un CA : " + v ));
-    }
+	/*
+	 * Exercice 4
+	 */
+	public static JavaPairRDD<Long, Double> computeStoreCAUsingReduceByKey(SparkSession sparkSession,
+			String filePath) {
+		JavaRDD<Sale> salesAsObjects = JavaSparkContext.fromSparkContext(sparkSession.sparkContext()).textFile(filePath)
+				.map((Function<String, Sale>) s -> Sale.parse(s));
 
-    /*
-    Exercice 7
-     */
-    public static void CAOfQuarterBetweenYears(SparkSession sparkSession,String salesFilePath,String timeByDayFilePath, String quarter){
-        // Clé=TimeId et Valeur=Année
-        Map<Integer, Integer> quarterTimeId = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(timeByDayFilePath)
-                .map((Function<String, TimeByDay>) s -> TimeByDay.parse(s))
-                .filter((Function<TimeByDay, Boolean>) s -> s.getQuarter().equals(quarter))
-                .mapToPair((PairFunction<TimeByDay, Integer, Integer>) timeByDay -> new Tuple2<>(timeByDay.getTimeId(), timeByDay.getTheYear()))
-                .collectAsMap();
+		JavaPairRDD<Long, Double> storeCA = salesAsObjects
+				.mapToPair(sale -> new Tuple2<>(sale.getStoreId(), sale.getStoreSales() * sale.getUnitSales()))
+				.reduceByKey((Function2<Double, Double, Double>) (a, b) -> a + b);
 
-        Broadcast<Map<Integer, Integer>> filteredTimeIds = sparkSession.sparkContext().broadcast(quarterTimeId, ClassTag$.MODULE$.apply(Map.class));
-        JavaPairRDD<Integer, Double>  yearCAQuarter= JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(salesFilePath)
-                .map((Function<String, Sale>) s -> Sale.parse(s))
-                .filter((Function<Sale, Boolean>) sale -> filteredTimeIds.value().containsKey(sale.getTimeId()))
-                .mapToPair((PairFunction<Sale, Integer, Double>) sale ->
-                        new Tuple2<>(filteredTimeIds.value().getOrDefault(sale.getTimeId(), -1), sale.getStoreSales() * sale.getUnitSales()))
-                .reduceByKey((x, y) -> x + y);
+		storeCA.collectAsMap()
+				.forEach((k, v) -> System.out.println("Magasin : " + k + " a un chiffre d'affaires : " + v));
+		return storeCA;
+	}
 
-        yearCAQuarter.collectAsMap().forEach((k,v) -> System.out.println("CA " + quarter + " de l'ann�e " + k + " : " + v ));
-    }
+	/*
+	 * Exercice 4
+	 */
+	public static JavaPairRDD<Long, Double> computeStoreCAUsingGroupByKey(SparkSession sparkSession,
+			String filePath) {
 
-    /*
-    Exercice 8
-     */
-    public static void saveEnrichedSalesToES(SparkSession sparkSession,String salesFilePath){
-        JavaRDD<Sale> sales = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(salesFilePath)
-                .map((Function<String, Sale>) s -> Sale.parse(s));
+		JavaPairRDD<Long, Double> storeCA = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
+				.textFile(filePath).map((Function<String, Sale>) s -> Sale.parse(s))
+				.mapToPair((PairFunction<Sale, Long, Double>) sale -> new Tuple2<>(sale.getStoreId(),
+						sale.getStoreSales() * sale.getUnitSales()))
+				.groupByKey().mapToPair(
+						(PairFunction<Tuple2<Long, Iterable<Double>>, Long, Double>) storeSalesCA -> new Tuple2<>(
+								storeSalesCA._1(), StreamSupport.stream(storeSalesCA._2().spliterator(), false)
+										.reduce((x, y) -> x + y).get()));
+		storeCA.collectAsMap()
+				.forEach((k, v) -> System.out.println("Magasin : " + k + " a un chiffre d'affaires : " + v));
+		return storeCA;
+	}
 
-        sales.foreachPartition((VoidFunction<Iterator<Sale>>) saleIterator -> {
-            ESClient es = new ESClient("localhost",9200) ;
-            ObjectMapper oMapper = new ObjectMapper();
-            saleIterator.forEachRemaining(sale -> {
-                Map<String, Object> map = oMapper.convertValue(sale, Map.class);
-                es.index("sales",map);
-            });
-        });
+	/*
+	 * Exercice 5
+	 */
+	public static Map<Long, Long> numberOfUnitsSoltByStore(SparkSession sparkSession, String filePath) {
+		Map<Long, Long> numberUnitsByStore = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
+				.textFile(filePath).map((Function<String, Sale>) s -> Sale.parse(s))
+				.mapToPair((PairFunction<Sale, Long, Double>) sale -> new Tuple2<>(sale.getStoreId(),
+						sale.getUnitSales()))
+				.countByKey();
+		numberUnitsByStore.forEach((k, v) -> System.out.println("Magasin : " + k + " a un vendu : " + v + " unités"));
+		return numberUnitsByStore;
+	}
 
-        sales.mapPartitions((FlatMapFunction<Iterator<Sale>, Object>) saleIterator -> {
-            ESClient es = new ESClient("localhost",9200) ;
-            ObjectMapper oMapper = new ObjectMapper();
-            saleIterator.forEachRemaining(sale -> {
-                Map<String, Object> map = oMapper.convertValue(sale, Map.class);
-                es.index("sales",map);
-            });
-            return null;
-        }).take(1);
-    }
+	/*
+	 * Exercice 6
+	 */
+	public static void computeTopPerformerDepartment(SparkSession sparkSession, String salesFilePath,
+			String storeFilePath) {
+		// Lecture du fichier store à broadcaster (fichier très petit)
+		Map<Integer, Integer> storeRegionMapRdd = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
+				.textFile(storeFilePath).mapToPair((PairFunction<String, Integer, Integer>) s -> {
+					Store parse = Store.parse(s);
+					return new Tuple2<>(parse.getStoreId(), parse.getRegionId());
+				}).collectAsMap();
 
+		Broadcast<Map<Integer, Integer>> storeRegionMap = sparkSession.sparkContext().broadcast(storeRegionMapRdd,
+				ClassTag$.MODULE$.apply(Map.class));
 
-    /*
-    Exercice 9
-     */
-    public static void averageBasketByEducationLevel(SparkSession sparkSession,String salesFilePath,String customerFilePath) {
-        JavaPairRDD<Long, String> customerEducationLevel = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(customerFilePath)
-                .mapToPair((PairFunction<String, Long, String>) s -> {
-                    Customer parse = Customer.parse(s);
-                    return new Tuple2<>(parse.getCustomerId(), parse.getEducation());
-                });
+		// Faire un Map-side Join
+		JavaPairRDD<Integer, Double> caByRegion = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
+				.textFile(salesFilePath).mapToPair(s -> {
+					Sale sale = Sale.parse(s);
+					return new Tuple2<>(storeRegionMap.value().getOrDefault(sale.getStoreId(), -1),
+							sale.getUnitSales() * sale.getStoreSales());
+				}).reduceByKey((Function2<Double, Double, Double>) (a, b) -> a + b);
 
-        JavaPairRDD<Long, Double> customerSales = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(salesFilePath)
-                .mapToPair((PairFunction<String, Long, Double>) s -> {
-                            Sale parse = Sale.parse(s);
-                            return new Tuple2<>(parse.getCustomerId(), parse.getUnitSales() * parse.getStoreSales());
-                        }
-                );
-        JavaPairRDD<String, Double> educationExpenses =
-                customerSales.join(customerEducationLevel)
-                        .values()
-                        .mapToPair((PairFunction<Tuple2<Double, String>, String, Double>) t ->
-                                    new Tuple2<>(t._2(), t._1()))
-                        .reduceByKey((Function2<Double, Double, Double>) (o, o2) -> o + o2);
-        educationExpenses.collectAsMap().forEach((k,v) -> System.out.println("Education level : " + k + " a un chiffre d'affaires : " + v));
-    }
+		caByRegion.collectAsMap().forEach((k, v) -> System.out.println("Region : " + k + " avec un CA : " + v));
+	}
 
-    /*
-    Exercice 10
-     */
-    public static void saveAsCSV(SparkSession sparkSession,String salesFilePath){
-        JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
-                .textFile(salesFilePath)
-                .map((Function<String, Sale>) s -> Sale.parse(s))
-                .map(s -> s.toCSVFormat(";"))
-                .saveAsTextFile("data/salesenriched.csv");
-    }
+	/*
+	 * Exercice 7
+	 */
+	public static void CAOfQuarterBetweenYears(SparkSession sparkSession, String salesFilePath,
+			String timeByDayFilePath, String quarter) {
+		// Clé=TimeId et Valeur=Année
+		Map<Integer, Integer> quarterTimeId = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
+				.textFile(timeByDayFilePath).map((Function<String, TimeByDay>) s -> TimeByDay.parse(s))
+				.filter((Function<TimeByDay, Boolean>) s -> s.getQuarter().equals(quarter))
+				.mapToPair((PairFunction<TimeByDay, Integer, Integer>) timeByDay -> new Tuple2<>(timeByDay.getTimeId(),
+						timeByDay.getYear()))
+				.collectAsMap();
+
+		Broadcast<Map<Integer, Integer>> filteredTimeIds = sparkSession.sparkContext().broadcast(quarterTimeId,
+				ClassTag$.MODULE$.apply(Map.class));
+		JavaPairRDD<Integer, Double> yearCAQuarter = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
+				.textFile(salesFilePath).map((Function<String, Sale>) s -> Sale.parse(s))
+				.filter((Function<Sale, Boolean>) sale -> filteredTimeIds.value().containsKey(sale.getTimeId()))
+				.mapToPair((PairFunction<Sale, Integer, Double>) sale -> new Tuple2<>(
+						filteredTimeIds.value().getOrDefault(sale.getTimeId(), -1),
+						sale.getStoreSales() * sale.getUnitSales()))
+				.reduceByKey((x, y) -> x + y);
+
+		yearCAQuarter.collectAsMap()
+				.forEach((k, v) -> System.out.println("CA " + quarter + " de l'ann�e " + k + " : " + v));
+	}
+
+	/*
+	 * Exercice 8
+	 */
+	public static void saveEnrichedSalesToES(SparkSession sparkSession, String salesFilePath) {
+		JavaRDD<Sale> sales = JavaSparkContext.fromSparkContext(sparkSession.sparkContext()).textFile(salesFilePath)
+				.map((Function<String, Sale>) s -> Sale.parse(s));
+
+		sales.foreachPartition((VoidFunction<Iterator<Sale>>) saleIterator -> {
+			ESClient es = new ESClient("localhost", 9200);
+			ObjectMapper oMapper = new ObjectMapper();
+			saleIterator.forEachRemaining(sale -> {
+				Map<String, Object> map = oMapper.convertValue(sale, Map.class);
+				es.index("sales", map);
+			});
+		});
+
+		sales.mapPartitions((FlatMapFunction<Iterator<Sale>, Object>) saleIterator -> {
+			ESClient es = new ESClient("localhost", 9200);
+			ObjectMapper oMapper = new ObjectMapper();
+			saleIterator.forEachRemaining(sale -> {
+				Map<String, Object> map = oMapper.convertValue(sale, Map.class);
+				es.index("sales", map);
+			});
+			return null;
+		}).take(1);
+	}
+
+	/*
+	 * Exercice 9
+	 */
+	public static void averageBasketByEducationLevel(SparkSession sparkSession, String salesFilePath,
+			String customerFilePath) {
+		JavaPairRDD<Long, String> customerEducationLevel = JavaSparkContext
+				.fromSparkContext(sparkSession.sparkContext()).textFile(customerFilePath)
+				.mapToPair((PairFunction<String, Long, String>) s -> {
+					Customer2 parse = Customer2.parse(s);
+					return new Tuple2<>(parse.getCustomerId(), parse.getEducation());
+				});
+
+		JavaPairRDD<Long, Double> customerSales = JavaSparkContext.fromSparkContext(sparkSession.sparkContext())
+				.textFile(salesFilePath).mapToPair((PairFunction<String, Long, Double>) s -> {
+					Sale parse = Sale.parse(s);
+					return new Tuple2<>(parse.getCustomerId(), parse.getUnitSales() * parse.getStoreSales());
+				});
+		JavaPairRDD<String, Double> educationExpenses = customerSales.join(customerEducationLevel).values()
+				.mapToPair((PairFunction<Tuple2<Double, String>, String, Double>) t -> new Tuple2<>(t._2(), t._1()))
+				.reduceByKey((Function2<Double, Double, Double>) (o, o2) -> o + o2);
+		educationExpenses.collectAsMap()
+				.forEach((k, v) -> System.out.println("Education level : " + k + " a un chiffre d'affaires : " + v));
+	}
+
+	/*
+	 * Exercice 10
+	 */
+	public static void saveAsCSV(SparkSession sparkSession, String salesFilePath) {
+		JavaSparkContext.fromSparkContext(sparkSession.sparkContext()).textFile(salesFilePath)
+				.map((Function<String, Sale>) s -> Sale.parse(s)).map(s -> s.toCSVFormat(";"))
+				.saveAsTextFile("data/salesenriched.csv");
+	}
 
 }

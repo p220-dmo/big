@@ -1,1 +1,8 @@
-hadoop jar WordCount-0.0.1-SNAPSHOT.jar fr.htc.hadoop.WordCount /user/raj_ops/dmo/mapred/input/ /user/raj_ops/dmo/mapred/output/r1²
+ 
+
+
+hadoop jar WordCount-0.0.1-SNAPSHOT.jar fr.htc.hadoop.WordCount  /user/raj_ops/dmo/mapred/in/  /user/raj_ops/dmo/mapred/out/r1
+
+
+
+hadoop jar sales-kpi-0.0.1-SNAPSHOT.jar fr.htc.kpi.CaByStoreJob /user/raj_ops/dmo/mapred/sales_in/  /user/raj_ops/dmo/mapred/ca_out/r1
